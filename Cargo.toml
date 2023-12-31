@@ -1,5 +1,5 @@
 [package]
-name = "handlr"
+name = "handl"
 description = "fURL data handler"
 version = "0.1.0"
 license = "Unlicense"
