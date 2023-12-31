@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "handlr"
+name = "handl"
 version = "0.1.0"
 dependencies = [
  "getrandom",

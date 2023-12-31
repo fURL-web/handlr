@@ -1,5 +1,5 @@
-use super::users::*;
-use crate::posts::*;
+use super::users::User;
+use crate::posts::Post;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -8,13 +8,12 @@ pub struct Comment {
     pub user_uuid: String,
     pub comment_body: String,
     pub comment_uuid: String,
-
     pub comment_likes: usize,
     pub comment_dislikes: usize,
 }
 
 impl Comment {
-    pub fn new(comment_body: &str, user: &User) -> Comment {
+    pub fn new(comment_body: &str, user: &User) -> Self {
         let user_uuid = &user.id;
         let comment_uuid = Uuid::new_v4().to_string();
         Self {
@@ -27,32 +26,37 @@ impl Comment {
     }
 
     pub fn save(&self, post_uuid: &str, user_uuid: &User) -> Result<(), String> {
-        let mut post = Post::load(post_uuid, user_uuid).unwrap_or_else(|| {
-            panic!(
+        let mut post = Post::load(post_uuid, user_uuid).ok_or_else(|| {
+            format!(
                 "Post with uuid {} not found when saving comment.",
                 post_uuid
             )
-        });
+        })?;
 
-        let comment_json = serde_json::to_value(self).unwrap();
+        let comment_json = serde_json::to_value(self)
+            .map_err(|err| format!("Failed to serialize comment to JSON: {}", err))?;
 
         post.comments.push(comment_json);
-        post.save().expect("Failed to save post with new comment");
+        post.save()
+            .map_err(|err| format!("Failed to save post with new comment: {}", err))?;
 
         Ok(())
     }
 
-    pub fn load(post_uuid: &str, comment_uuid: &str, user_uuid: &User) -> Option<Comment> {
+    pub fn load(post_uuid: &str, comment_uuid: &str, user_uuid: &User) -> Option<Self> {
         let post = Post::load(post_uuid, user_uuid)?;
 
-        for comment_json in post.comments {
-            let comment: Comment = serde_json::from_value(comment_json).ok()?;
-            if comment.comment_uuid == comment_uuid {
-                return Some(comment);
-            }
-        }
-
-        None
+        post.comments.iter().find_map(|comment_json| {
+            serde_json::from_value(comment_json.clone())
+                .ok()
+                .and_then(|comment: Comment| {
+                    if comment.comment_uuid == comment_uuid {
+                        Some(comment)
+                    } else {
+                        None
+                    }
+                })
+        })
     }
 
     pub fn update(&mut self, new_body: &str) {
@@ -67,14 +71,10 @@ impl Comment {
             )
         });
 
-        post.comments = post
-            .comments
-            .into_iter()
-            .filter(|comment_json| {
-                let comment: Comment = serde_json::from_value(comment_json.clone()).unwrap();
-                comment.comment_uuid != self.comment_uuid
-            })
-            .collect();
+        post.comments.retain(|comment_json| {
+            let comment: Comment = serde_json::from_value(comment_json.clone()).unwrap();
+            comment.comment_uuid != self.comment_uuid
+        });
 
         post.save()
             .expect("Failed to save post after deleting comment");
