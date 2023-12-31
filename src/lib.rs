@@ -57,16 +57,4 @@ mod test {
 
         user.create_comment(&comment.comment_uuid);
     }
-
-    #[test]
-    pub fn does_user_exist() {
-        let user = User::new("thebearodactyl", "The Motherfucking Bearodactyl", "uwu");
-        user.save().expect("UWU");
-
-        if User::load(user.id.as_str()).is_some() {
-            println!("Found user: {}", user.id);
-        } else {
-            eprintln!("owo");
-        }
-    }
 }
